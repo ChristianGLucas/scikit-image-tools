@@ -1,0 +1,73 @@
+name: christiangeorgelucas/scikit-image-tools
+version: 0.1.0
+language: python
+description: Composable Axiom scientific-image-analysis nodes (thresholding, region measurement/regionprops, segmentation, morphology, feature detection, texture, denoising) wrapping scikit-image (BSD-3-Clause).
+nodes:
+    - name: Threshold
+      input: ThresholdInput
+      output: ThresholdResult
+      description: Computes a global or adaptive binarization threshold for a grayscale image (Otsu, adaptive-local-mean, Li, or Yen methods) and returns the binary mask (255=foreground) plus the numeric threshold used. Wraps skimage.filters.
+    - name: RegionProps
+      input: RegionPropsInput
+      output: RegionPropsResult
+      description: Labels connected components of a binary mask (skimage.measure.label) and computes per-region measurements (skimage.measure.regionprops) — area, centroid, bounding box, eccentricity, orientation, perimeter, solidity, mean intensity, axis lengths, extent, Euler number. The flagship node for counting and measuring discrete objects (cells, particles, blobs) in an image.
+    - name: CountObjects
+      input: CountObjectsInput
+      output: CountObjectsResult
+      description: Convenience node that thresholds a grayscale image and counts the resulting connected components in one call, returning the count plus aggregate area statistics — without the full per-region table RegionProps returns.
+    - name: SegmentSlic
+      input: SlicInput
+      output: SlicResult
+      description: Segments an image into superpixels via SLIC (Simple Linear Iterative Clustering, skimage.segmentation.slic), a caller-supplied seed making the otherwise-randomized algorithm fully deterministic. Returns the segment count and per-segment area/centroid/mean-color statistics.
+    - name: SegmentFelzenszwalb
+      input: FelzenszwalbInput
+      output: FelzenszwalbResult
+      description: Segments an image via the deterministic graph-based Felzenszwalb-Huttenlocher algorithm (skimage.segmentation.felzenszwalb). Returns the segment count and per-segment area/centroid/mean-color statistics.
+    - name: SegmentWatershed
+      input: WatershedInput
+      output: WatershedResult
+      description: Separates touching objects in a binary mask via marker-based watershed (distance transform + local-maxima seeding, skimage.segmentation.watershed) — the standard technique for splitting adjoining cells/particles that a plain connected-components label would merge into one region. Returns the segment count and per-segment statistics.
+    - name: DetectEdges
+      input: EdgeInput
+      output: EdgeResult
+      description: Detects edges in an image via Canny, Sobel, or Scharr operators (skimage.feature.canny / skimage.filters.sobel / scharr). Returns the edge/gradient map as a single-channel image plus the overall edge density.
+    - name: DetectCorners
+      input: CornersInput
+      output: CornersResult
+      description: Detects corner keypoints via the Harris or Shi-Tomasi corner-response operators (skimage.feature.corner_harris / corner_shi_tomasi + corner_peaks). Returns corner pixel coordinates ranked by response strength.
+    - name: DetectBlobs
+      input: BlobsInput
+      output: BlobsResult
+      description: Detects blob-like structures via Laplacian-of-Gaussian or Difference-of-Gaussian scale-space detectors (skimage.feature.blob_log / blob_dog). Returns each blob's center coordinates and approximate radius.
+    - name: Morphology
+      input: MorphologyInput
+      output: MorphologyResult
+      description: Applies a binary morphological operation — erosion, dilation, opening, closing, skeletonize, or remove_small_objects — to a mask (skimage.morphology). Returns the transformed mask.
+    - name: ComputeHOG
+      input: HogInput
+      output: HogResult
+      description: Computes the Histogram of Oriented Gradients (HOG) feature descriptor (skimage.feature.hog), the classic gradient-orientation feature vector used for object/shape detection and classification. Returns the flattened feature vector and, optionally, a visualization image.
+    - name: ConvertColorSpace
+      input: ColorConvertInput
+      output: ColorConvertResult
+      description: Converts an image between color spaces — RGB to/from grayscale, HSV, or CIE Lab (skimage.color). HSV/Lab channels are min-max rescaled to 0-255 per channel for PNG storage.
+    - name: TextureFeatures
+      input: TextureInput
+      output: TextureResult
+      description: Computes Gray-Level Co-occurrence Matrix (GLCM) texture descriptors — contrast, dissimilarity, homogeneity, energy, correlation, ASM (skimage.feature.graycomatrix / graycoprops), the classic Haralick texture features for scientific/microscopy image analysis — averaged over the given pixel distances and angles.
+    - name: Denoise
+      input: DenoiseInput
+      output: DenoiseResult
+      description: Denoises an image via total-variation, bilateral, or wavelet filtering (skimage.restoration). Returns the denoised image.
+    - name: FindContours
+      input: ContoursInput
+      output: ContoursResult
+      description: Finds iso-valued contour lines at a given intensity level via marching squares (skimage.measure.find_contours). Returns each contour's (row, col) point path and length, longest first.
+    - name: ImageStatistics
+      input: StatsInput
+      output: StatsResult
+      description: Computes per-channel image statistics — mean, standard deviation, min, max, and histogram — plus the grayscale Shannon entropy of the image.
+    - name: AdjustImage
+      input: AdjustInput
+      output: AdjustResult
+      description: Adjusts image exposure via global histogram equalization, CLAHE (contrast-limited adaptive histogram equalization), or gamma correction (skimage.exposure). Returns the adjusted image.

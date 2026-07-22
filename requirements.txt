@@ -1,0 +1,12 @@
+# Runtime dependencies for christiangeorgelucas/scikit-image-tools.
+# Pinned for deterministic, reproducible builds (BSD-3-Clause tree, verified transitively).
+scikit-image==0.26.0
+numpy==2.5.1
+scipy==1.18.0
+pillow==12.3.0
+imageio==2.37.4
+networkx==3.6.1
+tifffile==2026.7.14
+lazy-loader==0.5
+packaging==26.2
+PyWavelets==1.9.0

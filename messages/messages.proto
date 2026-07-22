@@ -1,0 +1,510 @@
+// Data contracts for christiangeorgelucas/scikit-image-tools.
+//
+// Every node shares the canonical `Image` envelope (field-for-field identical
+// to christiangeorgelucas/image-tools' and opencv-tools' `Image`: data/format/
+// width/height/url) so flows compose across all three packages with a
+// single-field adapter. UNLIKE those two packages, this package is offline and
+// deterministic by design: the `url` field exists only for structural/flow-edge
+// compatibility — no node fetches it. If `data` is empty and `url` is set, the
+// node returns a structured `error` rather than making a network call.
+//
+// This package is scikit-image's SCIENTIFIC image-analysis surface: threshold,
+// label + measure (regionprops), segment, detect (edges/corners/blobs),
+// morphology, texture (GLCM), HOG features, denoise, contours, statistics, and
+// exposure adjustment. It is deliberately distinct from image-tools (Pillow
+// basic ops: resize/crop/rotate/convert) and opencv-tools (OpenCV CV ops).
+//
+// Every output message carries a trailing `error` string field: empty on
+// success, set instead of raising when input is malformed, oversized, or
+// otherwise invalid. Callers should always check `error` first.
+
+syntax = "proto3";
+
+package christiangeorgelucas.scikit_image_tools;
+
+// The canonical in-flight image. Every node's input carries one; nodes that
+// return a transformed image return one. `data`/`format`/`width`/`height` are
+// always populated on a successful output. `url` is accepted for flow-edge
+// shape compatibility with image-tools/opencv-tools only — this package never
+// fetches it; if `data` is empty and `url` is set, the node returns a
+// structured error instead of making a network call (this package is
+// offline-only and deterministic).
+message Image {
+  // Raw image bytes (base64-encoded over the JSON bridge). Always set on
+  // success output. On input, PNG/JPEG are recommended; capped at ~3 MiB
+  // decoded and 8000px per side.
+  bytes data = 1;
+  // Encoding of `data`: "PNG", "JPEG", "GIF", "BMP", "TIFF". Output is always PNG.
+  string format = 2;
+  // Image width in pixels. Populated on output.
+  int32 width = 3;
+  // Image height in pixels. Populated on output.
+  int32 height = 4;
+  // NOT FETCHED by this package (offline-only). Present only for flow-edge
+  // shape compatibility with image-tools/opencv-tools' `Image`.
+  string url = 5;
+}
+
+// A single 2D coordinate. For region/contour points, (row, col) i.e. (y, x)
+// in pixel space, matching scikit-image's array-index convention.
+message Point {
+  double row = 1;
+  double col = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Threshold
+
+// Input for Threshold. Computes a global binarization threshold for a
+// grayscale (or auto-converted) image and returns the binary mask.
+message ThresholdInput {
+  // The image to threshold (grayscale expected; color images are converted
+  // via luminosity first).
+  Image image = 1;
+  // One of "otsu", "adaptive", "li", "yen". Defaults to "otsu" when empty.
+  string method = 2;
+  // Block size for "adaptive" (must be odd, >= 3). Defaults to 11.
+  int32 adaptive_block_size = 3;
+  // Constant subtracted from the local mean for "adaptive". Defaults to 0.
+  double adaptive_offset = 4;
+}
+
+// Output of Threshold: the binary mask (255=foreground/above-threshold,
+// 0=background) as a single-channel PNG, plus the numeric threshold used.
+// For "adaptive", `threshold` is the mean of the local threshold surface.
+message ThresholdResult {
+  Image mask = 1;
+  double threshold = 2;
+  string method = 3;
+  // Structured error message; empty on success.
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// RegionProps (label connected components + measure) — flagship node
+
+// Input for RegionProps. Labels connected components of a binary mask and
+// computes per-region measurements (scikit-image `regionprops`).
+message RegionPropsInput {
+  // Binary (or already-labeled) mask: any nonzero pixel is foreground.
+  // Typically the `mask` output of Threshold.
+  Image mask = 1;
+  // OPTIONAL: a same-size intensity image to compute `mean_intensity` against.
+  // When empty, the mask itself is used as the intensity image.
+  Image intensity_image = 2;
+  // Pixel connectivity: 1 (4-connected) or 2 (8-connected). Defaults to 2.
+  int32 connectivity = 3;
+  // Regions with area strictly smaller than this (pixels) are dropped.
+  // Defaults to 0 (no filtering). Bounded to <= 1,000,000.
+  int32 min_area = 4;
+  // Caps the number of regions returned (bounds response size on
+  // pathological inputs, e.g. salt-and-pepper noise). Defaults to 5000.
+  int32 max_regions = 5;
+}
+
+// One labeled region's measurements (scikit-image regionprops fields).
+message Region {
+  int32 label = 1;
+  double area = 2;
+  double centroid_row = 3;
+  double centroid_col = 4;
+  int32 bbox_min_row = 5;
+  int32 bbox_min_col = 6;
+  int32 bbox_max_row = 7;
+  int32 bbox_max_col = 8;
+  double eccentricity = 9;
+  // Orientation in radians, counter-clockwise from the column (x) axis,
+  // matching scikit-image's convention.
+  double orientation = 10;
+  double perimeter = 11;
+  double solidity = 12;
+  double mean_intensity = 13;
+  double major_axis_length = 14;
+  double minor_axis_length = 15;
+  double extent = 16;
+  int32 euler_number = 17;
+  double equivalent_diameter = 18;
+}
+
+message RegionPropsResult {
+  repeated Region regions = 1;
+  // Total number of regions found (before max_regions truncation).
+  int32 count = 2;
+  // True when `regions` was truncated by max_regions.
+  bool truncated = 3;
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// CountObjects (lightweight threshold+label convenience)
+
+// Input for CountObjects. Thresholds a grayscale image and counts the
+// resulting connected components, without returning a full region table.
+message CountObjectsInput {
+  Image image = 1;
+  // One of "otsu", "li", "yen". Defaults to "otsu" when empty.
+  string threshold_method = 2;
+  // Pixel connectivity: 1 (4-connected) or 2 (8-connected). Defaults to 2.
+  int32 connectivity = 3;
+  // Regions with area strictly smaller than this (pixels) are excluded from
+  // the count. Defaults to 0.
+  int32 min_area = 4;
+}
+
+message CountObjectsResult {
+  int32 count = 1;
+  double threshold = 2;
+  double total_area = 3;
+  double mean_area = 4;
+  double min_area_found = 5;
+  double max_area_found = 6;
+  string error = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Segmentation: SLIC / Felzenszwalb / Watershed
+
+// Per-segment summary statistics shared by all three segmentation nodes.
+message SegmentStat {
+  int32 label = 1;
+  double area = 2;
+  double centroid_row = 3;
+  double centroid_col = 4;
+  // Mean channel intensity within the segment: grayscale value, or R,G,B for
+  // color images (mean_g/mean_b are 0 for grayscale input).
+  double mean_r = 5;
+  double mean_g = 6;
+  double mean_b = 7;
+}
+
+// Input for SegmentSlic (SLIC superpixels). `seed` makes the (otherwise
+// RNG-seeded) algorithm fully deterministic for a given input.
+message SlicInput {
+  Image image = 1;
+  // Approximate number of superpixels to produce. Defaults to 100. Bounded
+  // to [2, 2000].
+  int32 n_segments = 2;
+  // Balances color proximity vs. spatial proximity; higher = more
+  // square/compact segments. Defaults to 10.0.
+  double compactness = 3;
+  // Gaussian smoothing applied before segmentation. Defaults to 0.
+  double sigma = 4;
+  // Random seed for the algorithm's initialization (required for
+  // deterministic output across runs). Defaults to 0.
+  int32 seed = 5;
+  // Caps how many per-segment stats rows are returned. Defaults to 2000.
+  int32 max_segments_returned = 6;
+}
+
+message SlicResult {
+  int32 segment_count = 1;
+  repeated SegmentStat segments = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// Input for SegmentFelzenszwalb (graph-based segmentation).
+message FelzenszwalbInput {
+  Image image = 1;
+  // Higher favors larger/fewer segments. Defaults to 100.
+  double scale = 2;
+  // Gaussian smoothing applied before segmentation. Defaults to 0.8.
+  double sigma = 3;
+  // Minimum segment size in pixels (smaller segments get merged). Defaults to 20.
+  int32 min_size = 4;
+  int32 max_segments_returned = 5;
+}
+
+message FelzenszwalbResult {
+  int32 segment_count = 1;
+  repeated SegmentStat segments = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// Input for SegmentWatershed. Intended for separating touching blobs in a
+// binary mask: computes the distance transform, finds local-maxima seeds, and
+// runs marker-based watershed. Fully deterministic for a fixed input/params.
+message WatershedInput {
+  // Binary mask (e.g. the `mask` output of Threshold); nonzero = foreground.
+  Image mask = 1;
+  // Minimum pixel distance between watershed seed peaks (controls how
+  // aggressively touching blobs are split). Defaults to 10.
+  int32 min_distance = 2;
+  int32 max_segments_returned = 3;
+}
+
+message WatershedResult {
+  int32 segment_count = 1;
+  repeated SegmentStat segments = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Edge / corner / blob detection
+
+// Input for DetectEdges.
+message EdgeInput {
+  Image image = 1;
+  // One of "canny", "sobel", "scharr". Defaults to "sobel" when empty.
+  string method = 2;
+  // Gaussian smoothing sigma for "canny". Defaults to 1.0.
+  double sigma = 3;
+  // Lower hysteresis threshold for "canny" (0 = auto). Ignored otherwise.
+  double low_threshold = 4;
+  // Upper hysteresis threshold for "canny" (0 = auto). Ignored otherwise.
+  double high_threshold = 5;
+}
+
+message EdgeResult {
+  // Single-channel PNG: "canny" is a binary edge mask (0/255); "sobel" and
+  // "scharr" are the gradient-magnitude map, normalized to 0-255.
+  Image edge_map = 1;
+  // Fraction of pixels classed as edges (canny) or above the image's own mean
+  // gradient magnitude (sobel/scharr), in [0, 1].
+  double edge_density = 2;
+  string method = 3;
+  string error = 4;
+}
+
+// Input for DetectCorners.
+message CornersInput {
+  Image image = 1;
+  // One of "harris", "shi_tomasi". Defaults to "harris" when empty.
+  string method = 2;
+  // Minimum pixel distance between reported corner peaks. Defaults to 5.
+  int32 min_distance = 3;
+  // Caps the number of corners returned, strongest first. Defaults to 500.
+  int32 max_corners = 4;
+}
+
+message CornersResult {
+  repeated Point corners = 1;
+  int32 count = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// Input for DetectBlobs.
+message BlobsInput {
+  Image image = 1;
+  // One of "log" (Laplacian of Gaussian), "dog" (Difference of Gaussian).
+  // Defaults to "log" when empty.
+  string method = 2;
+  // Smallest blob standard deviation to detect. Defaults to 1.0.
+  double min_sigma = 3;
+  // Largest blob standard deviation to detect. Defaults to 30.0.
+  double max_sigma = 4;
+  // Absolute detection threshold; lower finds more/fainter blobs. Defaults to 0.1.
+  double threshold = 5;
+  // Caps the number of blobs returned, strongest first. Defaults to 500.
+  int32 max_blobs = 6;
+}
+
+message Blob {
+  double row = 1;
+  double col = 2;
+  // Approximate blob radius in pixels (sigma * sqrt(2)).
+  double radius = 3;
+}
+
+message BlobsResult {
+  repeated Blob blobs = 1;
+  int32 count = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Morphology
+
+// Input for Morphology. Applies a binary morphological operation to a mask.
+message MorphologyInput {
+  // Binary mask; nonzero = foreground.
+  Image mask = 1;
+  // One of "erosion", "dilation", "opening", "closing", "skeletonize",
+  // "remove_small_objects".
+  string operation = 2;
+  // Disk-shaped structuring-element radius for erosion/dilation/opening/
+  // closing. Defaults to 1. Ignored by skeletonize/remove_small_objects.
+  int32 footprint_size = 3;
+  // Minimum object size (pixels) to keep for "remove_small_objects". Defaults to 64.
+  int32 min_size = 4;
+}
+
+message MorphologyResult {
+  Image mask = 1;
+  string error = 2;
+}
+
+// ---------------------------------------------------------------------------
+// HOG (Histogram of Oriented Gradients)
+
+// Input for ComputeHOG.
+message HogInput {
+  Image image = 1;
+  // Number of orientation bins. Defaults to 9.
+  int32 orientations = 2;
+  // Cell size in pixels (square cells). Defaults to 8.
+  int32 pixels_per_cell = 3;
+  // Block size in cells (square blocks). Defaults to 2.
+  int32 cells_per_block = 4;
+  // When true, also return a normalized visualization image.
+  bool visualize = 5;
+}
+
+message HogResult {
+  // The flattened HOG feature vector.
+  repeated float features = 1;
+  int32 feature_count = 2;
+  // Populated only when `visualize` was true: the HOG gradient visualization,
+  // rescaled to the source image's dimensions, single-channel PNG.
+  Image visualization = 3;
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Color-space conversion
+
+// Input for ConvertColorSpace.
+message ColorConvertInput {
+  Image image = 1;
+  // One of "gray", "hsv", "lab". Defaults to "gray" when empty.
+  string target = 2;
+}
+
+// For "hsv"/"lab" (whose native channel ranges are not 0-255), each channel
+// is independently min-max rescaled to 0-255 for lossless-within-8-bit PNG
+// storage; channel semantics remain H,S,V or L,a,b in that order.
+message ColorConvertResult {
+  Image image = 1;
+  string target = 2;
+  string error = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Texture (GLCM — Haralick features)
+
+// Input for TextureFeatures. Computes Gray-Level Co-occurrence Matrix
+// texture descriptors, averaged across the given distances/angles.
+message TextureInput {
+  Image image = 1;
+  // Pixel offset distances. Defaults to [1] when empty.
+  repeated int32 distances = 2;
+  // Offset angles in radians. Defaults to [0, pi/4, pi/2, 3pi/4] when empty.
+  repeated double angles = 3;
+  // Number of gray levels the image is quantized to before computing the
+  // GLCM. Defaults to 32. Bounded to [2, 256].
+  int32 levels = 4;
+}
+
+message TextureResult {
+  double contrast = 1;
+  double dissimilarity = 2;
+  double homogeneity = 3;
+  double energy = 4;
+  double correlation = 5;
+  double asm = 6;
+  string error = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Denoise
+
+// Input for Denoise.
+message DenoiseInput {
+  Image image = 1;
+  // One of "tv" (total variation), "bilateral", "wavelet". Defaults to "tv".
+  string method = 2;
+  // Denoising weight for "tv" (higher = smoother). Defaults to 0.1.
+  double weight = 3;
+  // Color-distance sigma for "bilateral" (0 = auto). Defaults to 0.
+  double sigma_color = 4;
+  // Spatial sigma for "bilateral". Defaults to 1.0.
+  double sigma_spatial = 5;
+}
+
+message DenoiseResult {
+  Image image = 1;
+  string error = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Contours
+
+// Input for FindContours. Finds iso-valued contour lines (marching squares)
+// on a grayscale image at the given level.
+message ContoursInput {
+  Image image = 1;
+  // Iso-value level in 0-255 grayscale units. Defaults to 128.
+  double level = 2;
+  // Caps the number of contours returned, longest first. Defaults to 100.
+  int32 max_contours = 3;
+  // Caps points per contour; longer contours are evenly subsampled to this
+  // many points. Defaults to 500.
+  int32 max_points_per_contour = 4;
+}
+
+message Contour {
+  repeated Point points = 1;
+  // Full (pre-subsampling) point count.
+  int32 point_count = 2;
+  double length = 3;
+}
+
+message ContoursResult {
+  repeated Contour contours = 1;
+  int32 count = 2;
+  bool truncated = 3;
+  string error = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Statistics
+
+// Input for ImageStatistics.
+message StatsInput {
+  Image image = 1;
+  // Number of histogram bins per channel. Defaults to 256. Bounded to [2, 256].
+  int32 histogram_bins = 2;
+}
+
+message ChannelStats {
+  // "gray", "r", "g", "b", or "a".
+  string channel = 1;
+  double mean = 2;
+  double std = 3;
+  double min = 4;
+  double max = 5;
+  repeated int32 histogram = 6;
+}
+
+message StatsResult {
+  repeated ChannelStats channels = 1;
+  // Shannon entropy (bits) of the grayscale-converted image's histogram.
+  double entropy = 2;
+  string error = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Exposure adjustment
+
+// Input for AdjustImage.
+message AdjustInput {
+  Image image = 1;
+  // One of "equalize" (global histogram equalization), "clahe" (contrast-
+  // limited adaptive histogram equalization), "gamma". Defaults to "equalize".
+  string method = 2;
+  // Gamma exponent for "gamma" (output = input ** gamma). Defaults to 1.0.
+  double gamma = 3;
+  // Contrast-limiting clip limit for "clahe", in (0, 1]. Defaults to 0.01.
+  double clip_limit = 4;
+  // CLAHE tile grid size in pixels (0 = library default). Defaults to 0.
+  int32 kernel_size = 5;
+}
+
+message AdjustResult {
+  Image image = 1;
+  string error = 2;
+}
