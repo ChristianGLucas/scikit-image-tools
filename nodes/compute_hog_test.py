@@ -57,3 +57,10 @@ def test_compute_hog_excessive_feature_count_returns_structured_error(ax, image_
 def test_compute_hog_malformed_image_returns_structured_error(ax):
     result = compute_hog(ax, HogInput(image=Image(data=b"garbage")))
     assert result.error != ""
+
+
+def test_compute_hog_negative_orientations_returns_structured_error(ax, image_msg):
+    rng = np.random.default_rng(2)
+    arr = (rng.random((64, 64)) * 255).astype(np.uint8)
+    result = compute_hog(ax, HogInput(image=image_msg(arr), orientations=-5))
+    assert result.error != ""

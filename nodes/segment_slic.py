@@ -23,7 +23,9 @@ def segment_slic(ax: AxiomContext, input: SlicInput) -> SlicResult:
         n_segments = input.n_segments or 100
         if n_segments < 2 or n_segments > HARD_MAX_N_SEGMENTS:
             raise SkimgError(f"n_segments must be in [2, {HARD_MAX_N_SEGMENTS}]")
-        compactness = input.compactness if input.compactness > 0 else 10.0
+        compactness = input.compactness if input.compactness != 0 else 10.0
+        if compactness <= 0:
+            raise SkimgError("compactness must be > 0")
         sigma = max(0.0, input.sigma)
         max_segments_returned = input.max_segments_returned or DEFAULT_MAX_SEGMENTS_RETURNED
         max_segments_returned = min(max(max_segments_returned, 1), HARD_MAX_SEGMENTS_RETURNED)

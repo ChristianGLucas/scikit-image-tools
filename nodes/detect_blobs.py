@@ -23,11 +23,15 @@ def detect_blobs(ax: AxiomContext, input: BlobsInput) -> BlobsResult:
         if method not in _METHODS:
             raise SkimgError(f"unknown method {method!r}; expected one of {sorted(_METHODS)}")
 
-        min_sigma = input.min_sigma if input.min_sigma > 0 else 1.0
-        max_sigma = input.max_sigma if input.max_sigma > 0 else 30.0
+        min_sigma = input.min_sigma if input.min_sigma != 0 else 1.0
+        max_sigma = input.max_sigma if input.max_sigma != 0 else 30.0
+        if min_sigma <= 0:
+            raise SkimgError("min_sigma must be > 0")
+        if max_sigma <= 0:
+            raise SkimgError("max_sigma must be > 0")
         if max_sigma < min_sigma:
             raise SkimgError("max_sigma must be >= min_sigma")
-        threshold = input.threshold if input.threshold > 0 else 0.1
+        threshold = input.threshold if input.threshold != 0 else 0.1
         max_blobs = input.max_blobs or DEFAULT_MAX_BLOBS
         max_blobs = min(max(max_blobs, 1), HARD_MAX_BLOBS)
 

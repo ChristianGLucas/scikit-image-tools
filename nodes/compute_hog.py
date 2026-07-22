@@ -23,9 +23,9 @@ def compute_hog(ax: AxiomContext, input: HogInput) -> HogResult:
         arr = load_array(input.image)
         gray = to_gray(arr)
 
-        orientations = input.orientations if input.orientations > 0 else 9
-        ppc = input.pixels_per_cell if input.pixels_per_cell > 0 else 8
-        cpb = input.cells_per_block if input.cells_per_block > 0 else 2
+        orientations = input.orientations if input.orientations != 0 else 9
+        ppc = input.pixels_per_cell if input.pixels_per_cell != 0 else 8
+        cpb = input.cells_per_block if input.cells_per_block != 0 else 2
         if orientations < 1 or orientations > MAX_ORIENTATIONS:
             raise SkimgError(f"orientations must be in [1, {MAX_ORIENTATIONS}]")
         if ppc < 2 or ppc > MAX_PIXELS_PER_CELL:

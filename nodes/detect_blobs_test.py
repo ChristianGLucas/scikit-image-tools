@@ -60,3 +60,9 @@ def test_detect_blobs_unknown_method_returns_structured_error(ax, image_msg):
 def test_detect_blobs_malformed_image_returns_structured_error(ax):
     result = detect_blobs(ax, BlobsInput(image=Image(data=b"garbage")))
     assert result.error != ""
+
+
+def test_detect_blobs_negative_min_sigma_returns_structured_error(ax, image_msg):
+    arr = np.zeros((20, 20), dtype=np.uint8)
+    result = detect_blobs(ax, BlobsInput(image=image_msg(arr), min_sigma=-5))
+    assert result.error != ""

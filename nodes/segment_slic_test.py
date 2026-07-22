@@ -54,3 +54,8 @@ def test_segment_slic_rejects_out_of_range_n_segments(ax, image_msg):
 def test_segment_slic_malformed_image_returns_structured_error(ax):
     result = segment_slic(ax, SlicInput(image=Image(data=b"garbage")))
     assert result.error != ""
+
+
+def test_segment_slic_negative_compactness_returns_structured_error(ax, image_msg):
+    result = segment_slic(ax, SlicInput(image=image_msg(_half_red_half_blue()), compactness=-1))
+    assert result.error != ""
