@@ -2,10 +2,6 @@ from gen.messages_pb2 import RegionPropsInput, RegionPropsResult, Region
 from gen.axiom_context import AxiomContext
 from nodes._imaging import SkimgError, load_array
 
-MAX_MIN_AREA = 1_000_000
-DEFAULT_MAX_REGIONS = 5000
-HARD_MAX_REGIONS = 20000
-
 
 def region_props(ax: AxiomContext, input: RegionPropsInput) -> RegionPropsResult:
     """Labels connected components of a binary mask (any nonzero pixel is
@@ -17,8 +13,7 @@ def region_props(ax: AxiomContext, input: RegionPropsInput) -> RegionPropsResult
     `mask` output of Threshold. Supply `intensity_image` to compute
     `mean_intensity` against a different (e.g. original grayscale) image;
     otherwise the mask itself is used. `min_area` filters out tiny regions
-    (e.g. noise specks); `max_regions` bounds the response size on
-    pathological inputs. Wraps skimage.measure.label + regionprops.
+    (e.g. noise specks). Wraps skimage.measure.label + regionprops.
     """
     try:
         mask_arr = load_array(input.mask, allow_color=False)
@@ -43,13 +38,8 @@ def region_props(ax: AxiomContext, input: RegionPropsInput) -> RegionPropsResult
             raise SkimgError("connectivity must be 1 or 2")
 
         min_area = input.min_area
-        if min_area < 0 or min_area > MAX_MIN_AREA:
-            raise SkimgError(f"min_area must be in [0, {MAX_MIN_AREA}]")
-
-        max_regions = input.max_regions if input.max_regions != 0 else DEFAULT_MAX_REGIONS
-        if max_regions < 0:
-            raise SkimgError("max_regions must be > 0")
-        max_regions = min(max_regions, HARD_MAX_REGIONS)
+        if min_area < 0:
+            raise SkimgError("min_area must be >= 0")
 
         from skimage.measure import label, regionprops
 
@@ -59,8 +49,6 @@ def region_props(ax: AxiomContext, input: RegionPropsInput) -> RegionPropsResult
             props = [p for p in props if p.area >= min_area]
 
         total = len(props)
-        truncated = total > max_regions
-        props = props[:max_regions]
 
         regions = []
         for p in props:
@@ -88,6 +76,6 @@ def region_props(ax: AxiomContext, input: RegionPropsInput) -> RegionPropsResult
                 )
             )
 
-        return RegionPropsResult(regions=regions, count=total, truncated=truncated)
+        return RegionPropsResult(regions=regions, count=total)
     except SkimgError as exc:
         return RegionPropsResult(error=str(exc))

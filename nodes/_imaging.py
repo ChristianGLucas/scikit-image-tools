@@ -1,12 +1,14 @@
 """Shared scikit-image helpers: canonical `Image` message <-> a decoded numpy
-array, plus the input-safety caps and structured-error contract every node in
-this package uses.
+array, plus the structured-error contract every node in this package uses.
 
 This package is deliberately OFFLINE and DETERMINISTIC: unlike image-tools/
 opencv-tools, `Image.url` is never fetched (see messages.proto). Every node
 catches `SkimgError` at its boundary and returns it as a structured `error`
-field instead of raising — a malformed, oversized, or unfetchable input never
-crashes the node.
+field instead of raising — a malformed or unfetchable input never crashes the
+node. Payload size, pixel-count, and memory/CPU/time bounds are the
+platform's job (ingress/gateway/sidecar limits + sandboxed execution), not
+this package's — a node is a pure input -> output function and does not
+duplicate that enforcement.
 """
 from __future__ import annotations
 
@@ -15,11 +17,6 @@ import math
 
 import numpy as np
 from PIL import Image as PILImage
-
-# Input-surface safety caps (ADR: bound cost/CPU on a 1-vCPU node before any
-# heavy decode/processing happens).
-MAX_INPUT_BYTES = 3 * 1024 * 1024  # ~3 MiB decoded payload
-MAX_DIMENSION = 8000  # reject images wider or taller than this
 
 _ALIASES = {"JPG": "JPEG", "TIF": "TIFF"}
 
@@ -39,11 +36,10 @@ def normalize_format(fmt: str) -> str:
 def load_array(image, allow_color: bool = True) -> np.ndarray:
     """Resolve a canonical `Image` message into a decoded numpy array.
 
-    Enforces the input-safety caps: raw byte size, then (after a cheap header
-    peek, before full pixel decode) width/height. Raises `SkimgError` — never
-    a raw exception — for any malformed/oversized/unsupported input. This
-    package never fetches `url`; if `data` is empty and `url` is set, that is
-    itself a structured error (offline-only, no network policy).
+    Raises `SkimgError` — never a raw exception — for any malformed/
+    unsupported input. This package never fetches `url`; if `data` is empty
+    and `url` is set, that is itself a structured error (offline-only, no
+    network policy).
     """
     raw = bytes(image.data)
     if not raw:
@@ -53,11 +49,6 @@ def load_array(image, allow_color: bool = True) -> np.ndarray:
                 "deterministic — supply the image inline via `data`, not `url`"
             )
         raise SkimgError("Image has no `data` (and no `url` to reject cleanly)")
-    if len(raw) > MAX_INPUT_BYTES:
-        raise SkimgError(
-            f"input image too large: {len(raw)} bytes exceeds the "
-            f"{MAX_INPUT_BYTES}-byte (~3 MiB) cap"
-        )
     try:
         pil = PILImage.open(io.BytesIO(raw))
         pil.verify()
@@ -71,10 +62,6 @@ def load_array(image, allow_color: bool = True) -> np.ndarray:
     w, h = pil.size
     if w <= 0 or h <= 0:
         raise SkimgError(f"invalid image dimensions: {w}x{h}")
-    if w > MAX_DIMENSION or h > MAX_DIMENSION:
-        raise SkimgError(
-            f"image dimensions {w}x{h} exceed the {MAX_DIMENSION}px-per-side cap"
-        )
 
     try:
         if allow_color:
@@ -168,14 +155,14 @@ def shannon_entropy(gray01: np.ndarray, bins: int = 256) -> float:
     return float(-(p * np.log2(p)).sum())
 
 
-def segment_stats(labels: np.ndarray, source_arr: np.ndarray, max_segments: int):
+def segment_stats(labels: np.ndarray, source_arr: np.ndarray):
     """Shared per-segment summary-statistics computation for the three
     segmentation nodes (SLIC / Felzenszwalb / Watershed). `labels` is an
     int label array (0 or background excluded); `source_arr` is the
     original decoded image (grayscale or RGB/RGBA, any dtype) used for the
-    mean-color stats. Returns (rows, total_segment_count, truncated) where
-    `rows` is a list of dicts with label/area/centroid_row/centroid_col/
-    mean_r/mean_g/mean_b, capped at `max_segments`.
+    mean-color stats. Returns (rows, total_segment_count) where `rows` is a
+    list of dicts with label/area/centroid_row/centroid_col/mean_r/mean_g/
+    mean_b for every segment found.
     """
     from skimage.measure import regionprops
 
@@ -185,8 +172,6 @@ def segment_stats(labels: np.ndarray, source_arr: np.ndarray, max_segments: int)
 
     props = regionprops(labels, intensity_image=intensity)
     total = len(props)
-    truncated = total > max_segments
-    props = props[:max_segments]
 
     rows = []
     for p in props:
@@ -209,4 +194,4 @@ def segment_stats(labels: np.ndarray, source_arr: np.ndarray, max_segments: int)
                 "mean_b": mean_b,
             }
         )
-    return rows, total, truncated
+    return rows, total

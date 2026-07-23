@@ -3,8 +3,6 @@ from gen.axiom_context import AxiomContext
 from nodes._imaging import SkimgError, load_array, encode_mask
 
 _OPS = {"erosion", "dilation", "opening", "closing", "skeletonize", "remove_small_objects"}
-MAX_FOOTPRINT = 100
-MAX_MIN_SIZE = 1_000_000
 
 
 def morphology(ax: AxiomContext, input: MorphologyInput) -> MorphologyResult:
@@ -27,13 +25,13 @@ def morphology(ax: AxiomContext, input: MorphologyInput) -> MorphologyResult:
             result = skeletonize(mask)
         elif op == "remove_small_objects":
             min_size = input.min_size if input.min_size != 0 else 64
-            if min_size < 0 or min_size > MAX_MIN_SIZE:
-                raise SkimgError(f"min_size must be in [0, {MAX_MIN_SIZE}]")
+            if min_size < 0:
+                raise SkimgError("min_size must be >= 0")
             result = remove_small_objects(mask, max_size=max(min_size - 1, 0), connectivity=2)
         else:
             footprint_size = input.footprint_size if input.footprint_size != 0 else 1
-            if footprint_size < 1 or footprint_size > MAX_FOOTPRINT:
-                raise SkimgError(f"footprint_size must be in [1, {MAX_FOOTPRINT}]")
+            if footprint_size < 1:
+                raise SkimgError("footprint_size must be >= 1")
             selem = disk(footprint_size)
             fn = {"erosion": erosion, "dilation": dilation, "opening": opening, "closing": closing}[op]
             result = fn(mask, footprint=selem)

@@ -3,8 +3,6 @@ from gen.axiom_context import AxiomContext
 from nodes._imaging import SkimgError, load_array, to_gray
 
 _METHODS = {"log", "dog"}
-DEFAULT_MAX_BLOBS = 500
-HARD_MAX_BLOBS = 5000
 _SQRT2 = 1.4142135623730951
 
 
@@ -13,8 +11,8 @@ def detect_blobs(ax: AxiomContext, input: BlobsInput) -> BlobsResult:
     (skimage.feature.blob_log, default — more accurate) or Difference-of-
     Gaussian (blob_dog — faster) detectors. `min_sigma`/`max_sigma` bound the
     blob size range searched; lower `threshold` finds more/fainter blobs.
-    Returns each blob's (row, col) center and approximate radius
-    (sigma * sqrt(2)), capped at `max_blobs`.
+    Returns every blob's (row, col) center and approximate radius
+    (sigma * sqrt(2)) found.
     """
     try:
         arr = load_array(input.image)
@@ -32,8 +30,6 @@ def detect_blobs(ax: AxiomContext, input: BlobsInput) -> BlobsResult:
         if max_sigma < min_sigma:
             raise SkimgError("max_sigma must be >= min_sigma")
         threshold = input.threshold if input.threshold != 0 else 0.1
-        max_blobs = input.max_blobs or DEFAULT_MAX_BLOBS
-        max_blobs = min(max(max_blobs, 1), HARD_MAX_BLOBS)
 
         from skimage.feature import blob_log, blob_dog
 
@@ -43,10 +39,8 @@ def detect_blobs(ax: AxiomContext, input: BlobsInput) -> BlobsResult:
             found = blob_dog(gray, min_sigma=min_sigma, max_sigma=max_sigma, threshold=threshold)
 
         total = len(found)
-        truncated = total > max_blobs
-        found = found[:max_blobs]
         blobs = [Blob(row=float(r), col=float(c), radius=float(s) * _SQRT2) for r, c, s in found]
 
-        return BlobsResult(blobs=blobs, count=total, truncated=truncated)
+        return BlobsResult(blobs=blobs, count=total)
     except SkimgError as exc:
         return BlobsResult(error=str(exc))

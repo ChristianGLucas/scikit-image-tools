@@ -13,7 +13,6 @@ def test_region_props_finds_three_regions_with_correct_area_and_centroid(ax, thr
     result = region_props(ax, RegionPropsInput(mask=image_msg(three_squares["arr"])))
     assert result.error == ""
     assert result.count == 3
-    assert not result.truncated
     assert len(result.regions) == 3
 
     got = sorted(result.regions, key=lambda r: r.area)
@@ -79,17 +78,17 @@ def test_region_props_empty_mask_returns_zero_regions(ax, image_msg):
     assert list(result.regions) == []
 
 
-def test_region_props_max_regions_truncates(ax, image_msg):
-    # Ten separated 2x2 dots.
+def test_region_props_returns_every_region_no_truncation(ax, image_msg):
+    # Ten separated 2x2 dots — a node is a pure function; the platform, not
+    # this package, bounds response size, so all ten must come back.
     mask = np.zeros((20, 200), dtype=np.uint8)
     for i in range(10):
         c = 5 + i * 20
         mask[5:7, c : c + 2] = 255
-    result = region_props(ax, RegionPropsInput(mask=image_msg(mask), max_regions=3))
+    result = region_props(ax, RegionPropsInput(mask=image_msg(mask)))
     assert result.error == ""
     assert result.count == 10
-    assert result.truncated is True
-    assert len(result.regions) == 3
+    assert len(result.regions) == 10
 
 
 def test_region_props_malformed_mask_returns_structured_error(ax):

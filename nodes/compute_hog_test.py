@@ -45,15 +45,6 @@ def test_compute_hog_too_small_for_cell_size_returns_structured_error(ax, image_
     assert result.error != ""
 
 
-def test_compute_hog_excessive_feature_count_returns_structured_error(ax, image_msg):
-    # Tiny pixels_per_cell on a max-allowed-size-ish image would blow past
-    # the feature-count cap; use the smallest legal pixels_per_cell (2) on a
-    # moderately large image to trip the cap without needing an 8000px image.
-    arr = np.zeros((2000, 2000), dtype=np.uint8)
-    result = compute_hog(ax, HogInput(image=image_msg(arr), pixels_per_cell=2, cells_per_block=16, orientations=32))
-    assert result.error != ""
-
-
 def test_compute_hog_malformed_image_returns_structured_error(ax):
     result = compute_hog(ax, HogInput(image=Image(data=b"garbage")))
     assert result.error != ""

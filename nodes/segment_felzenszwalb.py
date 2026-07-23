@@ -2,9 +2,6 @@ from gen.messages_pb2 import FelzenszwalbInput, FelzenszwalbResult, SegmentStat
 from gen.axiom_context import AxiomContext
 from nodes._imaging import SkimgError, load_array, segment_stats
 
-DEFAULT_MAX_SEGMENTS_RETURNED = 2000
-HARD_MAX_SEGMENTS_RETURNED = 5000
-
 
 def segment_felzenszwalb(ax: AxiomContext, input: FelzenszwalbInput) -> FelzenszwalbResult:
     """Segments an image via the deterministic graph-based Felzenszwalb-
@@ -12,7 +9,7 @@ def segment_felzenszwalb(ax: AxiomContext, input: FelzenszwalbInput) -> Felzensz
     randomness involved, so output depends only on the image and params.
     Higher `scale` favors larger/fewer segments; `min_size` merges away
     segments smaller than it. Returns the segment count and per-segment
-    area/centroid/mean-color statistics, capped at `max_segments_returned`.
+    area/centroid/mean-color statistics for every segment found.
     """
     try:
         arr = load_array(input.image)
@@ -26,8 +23,6 @@ def segment_felzenszwalb(ax: AxiomContext, input: FelzenszwalbInput) -> Felzensz
         min_size = input.min_size if input.min_size != 0 else 20
         if min_size < 0:
             raise SkimgError("min_size must be >= 0")
-        max_segments_returned = input.max_segments_returned or DEFAULT_MAX_SEGMENTS_RETURNED
-        max_segments_returned = min(max(max_segments_returned, 1), HARD_MAX_SEGMENTS_RETURNED)
 
         from skimage.segmentation import felzenszwalb
 
@@ -38,8 +33,8 @@ def segment_felzenszwalb(ax: AxiomContext, input: FelzenszwalbInput) -> Felzensz
         # background, so shift to start at 1 to include every segment.
         labels = labels + 1
 
-        rows, total, truncated = segment_stats(labels, arr, max_segments_returned)
+        rows, total = segment_stats(labels, arr)
         segments = [SegmentStat(**r) for r in rows]
-        return FelzenszwalbResult(segment_count=total, segments=segments, truncated=truncated)
+        return FelzenszwalbResult(segment_count=total, segments=segments)
     except SkimgError as exc:
         return FelzenszwalbResult(error=str(exc))

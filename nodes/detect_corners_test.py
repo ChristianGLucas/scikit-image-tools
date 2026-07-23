@@ -29,17 +29,14 @@ def test_detect_corners_shi_tomasi(ax, white_square_corners, image_msg):
     assert result.count >= 4
 
 
-def test_detect_corners_max_corners_truncates(ax, white_square_corners, image_msg):
+def test_detect_corners_returns_every_corner_no_truncation(ax, white_square_corners, image_msg):
     result = detect_corners(
         ax,
-        CornersInput(
-            image=image_msg(white_square_corners["arr"]), method="harris", min_distance=1, max_corners=2
-        ),
+        CornersInput(image=image_msg(white_square_corners["arr"]), method="harris", min_distance=1),
     )
     assert result.error == ""
-    assert result.count > 2
-    assert result.truncated is True
-    assert len(result.corners) == 2
+    assert result.count >= 4
+    assert len(result.corners) == result.count
 
 
 def test_detect_corners_flat_image_finds_none(ax, uniform_gray, image_msg):

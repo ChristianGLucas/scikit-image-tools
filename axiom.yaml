@@ -1,5 +1,5 @@
 name: christiangeorgelucas/scikit-image-tools
-version: 0.1.0
+version: 0.1.1
 language: python
 description: Composable Axiom scientific-image-analysis nodes (thresholding, region measurement/regionprops, segmentation, morphology, feature detection, texture, denoising) wrapping scikit-image (BSD-3-Clause).
 nodes:

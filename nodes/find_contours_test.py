@@ -28,14 +28,14 @@ def test_find_contours_two_separate_squares_gives_two_contours(ax, image_msg):
     assert result.count == 2
 
 
-def test_find_contours_max_points_per_contour_subsamples(ax, image_msg):
+def test_find_contours_returns_every_point_no_subsampling(ax, image_msg):
     arr = np.zeros((200, 200), dtype=np.uint8)
     arr[20:180, 20:180] = 255
-    result = find_contours(ax, ContoursInput(image=image_msg(arr), level=128, max_points_per_contour=10))
+    result = find_contours(ax, ContoursInput(image=image_msg(arr), level=128))
     assert result.error == ""
     contour = result.contours[0]
-    assert contour.point_count > 10  # true point count before subsampling
-    assert len(contour.points) == 10
+    assert contour.point_count > 10
+    assert len(contour.points) == contour.point_count
 
 
 def test_find_contours_blank_image_finds_none(ax, image_msg):
@@ -45,16 +45,15 @@ def test_find_contours_blank_image_finds_none(ax, image_msg):
     assert result.count == 0
 
 
-def test_find_contours_max_contours_truncates(ax, image_msg):
+def test_find_contours_returns_every_contour_no_truncation(ax, image_msg):
     arr = np.zeros((20, 400), dtype=np.uint8)
     for i in range(10):
         c = 5 + i * 40
         arr[5:15, c : c + 10] = 255
-    result = find_contours(ax, ContoursInput(image=image_msg(arr), level=128, max_contours=3))
+    result = find_contours(ax, ContoursInput(image=image_msg(arr), level=128))
     assert result.error == ""
     assert result.count == 10
-    assert result.truncated is True
-    assert len(result.contours) == 3
+    assert len(result.contours) == 10
 
 
 def test_find_contours_malformed_image_returns_structured_error(ax):

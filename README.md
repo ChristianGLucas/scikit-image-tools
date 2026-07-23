@@ -15,10 +15,11 @@ surface: counting and measuring discrete objects, segmenting an image into
 regions, and extracting quantitative texture/shape features — the operations
 a microscopy, document-analysis, or computer-vision agent needs.
 
-All nodes are pure, deterministic, offline (no network calls — the `url`
+All nodes are pure, deterministic, and offline (no network calls — the `url`
 field on the shared `Image` envelope exists only for flow-edge shape
-compatibility with `image-tools`/`opencv-tools` and is never fetched), and
-input-bounded (images are capped at ~3 MiB and 8000px per side).
+compatibility with `image-tools`/`opencv-tools` and is never fetched).
+Payload size, pixel-count, and memory/CPU/time limits are enforced by the
+Axiom platform itself, not by this package.
 
 ## Nodes
 

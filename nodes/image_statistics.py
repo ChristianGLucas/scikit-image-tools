@@ -11,9 +11,9 @@ def image_statistics(ax: AxiomContext, input: StatsInput) -> StatsResult:
     """
     try:
         arr = load_array(input.image)
-        bins = input.histogram_bins if input.histogram_bins > 0 else 256
-        if bins < 2 or bins > 256:
-            raise SkimgError("histogram_bins must be in [2, 256]")
+        bins = input.histogram_bins if input.histogram_bins != 0 else 256
+        if bins < 1:
+            raise SkimgError("histogram_bins must be >= 1")
 
         import numpy as np
 

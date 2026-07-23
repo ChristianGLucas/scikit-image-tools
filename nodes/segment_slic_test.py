@@ -36,14 +36,11 @@ def test_segment_slic_recovers_the_red_blue_split(ax, image_msg):
     assert any(s.mean_b > 150 and s.mean_r < 50 for s in result.segments)
 
 
-def test_segment_slic_max_segments_returned_truncates(ax, image_msg):
-    result = segment_slic(
-        ax, SlicInput(image=image_msg(_half_red_half_blue()), n_segments=20, max_segments_returned=3)
-    )
+def test_segment_slic_returns_every_segment_no_truncation(ax, image_msg):
+    result = segment_slic(ax, SlicInput(image=image_msg(_half_red_half_blue()), n_segments=20))
     assert result.error == ""
-    assert result.segment_count > 3
-    assert result.truncated is True
-    assert len(result.segments) == 3
+    assert result.segment_count > 0
+    assert len(result.segments) == result.segment_count
 
 
 def test_segment_slic_rejects_out_of_range_n_segments(ax, image_msg):

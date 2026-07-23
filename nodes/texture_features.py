@@ -4,9 +4,7 @@ from gen.messages_pb2 import TextureInput, TextureResult
 from gen.axiom_context import AxiomContext
 from nodes._imaging import SkimgError, load_array, to_gray
 
-MAX_LEVELS = 256
-MAX_DISTANCE = 1000
-MAX_OFFSETS = 64  # distances x angles
+MAX_LEVELS = 256  # hard dtype limit: quantized gray levels are packed into np.uint8
 
 
 def texture_features(ax: AxiomContext, input: TextureInput) -> TextureResult:
@@ -31,10 +29,8 @@ def texture_features(ax: AxiomContext, input: TextureInput) -> TextureResult:
         angles = list(input.angles) if len(input.angles) else [0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4]
         if not distances or not angles:
             raise SkimgError("distances and angles must be non-empty")
-        if any(d < 1 or d > MAX_DISTANCE for d in distances):
-            raise SkimgError(f"each distance must be in [1, {MAX_DISTANCE}]")
-        if len(distances) * len(angles) > MAX_OFFSETS:
-            raise SkimgError(f"distances x angles must be <= {MAX_OFFSETS}")
+        if any(d < 1 for d in distances):
+            raise SkimgError("each distance must be >= 1")
 
         import numpy as np
         from skimage.feature import graycomatrix, graycoprops

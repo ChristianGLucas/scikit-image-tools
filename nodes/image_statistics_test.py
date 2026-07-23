@@ -39,8 +39,8 @@ def test_image_statistics_histogram_sums_to_pixel_count(ax, uniform_gray, image_
     assert sum(ch.histogram) == uniform_gray.size
 
 
-def test_image_statistics_invalid_bins_returns_structured_error(ax, uniform_gray, image_msg):
-    result = image_statistics(ax, StatsInput(image=image_msg(uniform_gray), histogram_bins=1))
+def test_image_statistics_negative_bins_returns_structured_error(ax, uniform_gray, image_msg):
+    result = image_statistics(ax, StatsInput(image=image_msg(uniform_gray), histogram_bins=-1))
     assert result.error != ""
 
 
