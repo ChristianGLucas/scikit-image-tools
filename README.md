@@ -5,7 +5,7 @@ thresholding, region measurement (regionprops), segmentation, morphology,
 feature detection, texture analysis, and denoising — wrapping
 [scikit-image](https://scikit-image.org/) (BSD-3-Clause) and numpy.
 
-Built for the [Axiom](https://axiom.dev) marketplace, handle
+Built for the [Axiom](https://axiomide.com) marketplace, handle
 `christiangeorgelucas`.
 
 This package is distinct from `image-tools` (basic Pillow operations — resize,
